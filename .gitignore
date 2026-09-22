@@ -1,0 +1,59 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.venv
+venv/
+ENV/
+
+# FastAPI
+cloud-server/.env
+cloud-server/*.db
+
+# Elder Agent
+elder-agent/.env
+elder-agent/*.db
+elder-agent/audio/
+elder-agent/models/
+
+# Family Miniapp
+family-miniapp/node_modules/
+family-miniapp/miniprogram_npm/
+family-miniapp/.DS_Store
+family-miniapp/dist/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Temporary
+tmp/
+temp/

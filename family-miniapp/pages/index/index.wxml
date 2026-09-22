@@ -1,0 +1,29 @@
+<view class="container">
+  <view class="card">
+    <view class="card-title">老人信息</view>
+    <view class="card-content">
+      <view>姓名：{{elder.name}}</view>
+      <view>年龄：{{elder.age}}</view>
+      <view>状态：{{elder.status}}</view>
+    </view>
+  </view>
+  
+  <view class="card">
+    <view class="card-title">今日活动</view>
+    <view class="card-content">
+      <view>用药提醒：{{stats.medication}}</view>
+      <view>活动次数：{{stats.activity}}</view>
+      <view>久坐时长：{{stats.sedentary}}</view>
+    </view>
+  </view>
+  
+  <view class="card">
+    <view class="card-title">最近告警</view>
+    <view class="card-content" wx:for="{{alerts}}" wx:key="id">
+      <view>{{item.type}} - {{item.time}}</view>
+    </view>
+    <view wx:if="{{alerts.length === 0}}" class="text-center">暂无告警</view>
+  </view>
+  
+  <button class="btn-primary" bindtap="goToDetail">查看详情</button>
+</view>

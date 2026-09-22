@@ -1,0 +1,16 @@
+<view class="container">
+  <view class="card" wx:for="{{alerts}}" wx:key="id">
+    <view class="card-title">{{item.alert_type}}</view>
+    <view class="card-content">
+      <view>优先级：{{item.priority}}</view>
+      <view>状态：{{item.status}}</view>
+      <view>时间：{{item.created_at}}</view>
+      <view>内容：{{item.content}}</view>
+    </view>
+    <button wx:if="{{item.status === 'pending'}}" class="btn-danger mt-20" bindtap="cancelAlert" data-id="{{item.id}}">取消告警</button>
+  </view>
+  
+  <view wx:if="{{alerts.length === 0}}" class="card text-center">
+    <view class="card-content">暂无告警记录</view>
+  </view>
+</view>

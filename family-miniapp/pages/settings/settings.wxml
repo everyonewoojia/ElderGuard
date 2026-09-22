@@ -1,0 +1,19 @@
+<view class="container">
+  <view class="card">
+    <view class="card-title">隐私设置</view>
+    <view class="card-content">
+      <switch checked="{{privacyEnabled}}" bindchange="togglePrivacy" />
+      <text>启用隐私授权</text>
+    </view>
+  </view>
+  
+  <view class="card">
+    <view class="card-title">通知设置</view>
+    <view class="card-content">
+      <switch checked="{{alertEnabled}}" bindchange="toggleAlert" />
+      <text>启用告警通知</text>
+    </view>
+  </view>
+  
+  <button class="btn-danger mt-20" bindtap="logout">退出登录</button>
+</view>
