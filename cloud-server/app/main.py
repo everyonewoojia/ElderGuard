@@ -1,5 +1,6 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.core.config import settings
 from app.routers import auth, tasks, alerts, elder, privacy
@@ -9,6 +10,15 @@ app = FastAPI(
     description="空巢老人智能看护系统云端服务",
     version="0.1.0"
 )
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    """统一错误码响应结构 {code, message, data}（P2-4）"""
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"code": exc.status_code, "message": exc.detail, "data": None},
+    )
 
 app.add_middleware(
     CORSMiddleware,

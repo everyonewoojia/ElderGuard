@@ -126,6 +126,38 @@ python src/main.py
 # 使用微信开发者工具打开 family-miniapp 目录
 ```
 
+## 测试运行（TDD）
+
+项目采用测试驱动开发，任何功能必须先写失败测试再实现。P0 工程基线已搭建三端测试基座。
+
+### 云端（cloud-server）
+
+```bash
+cd cloud-server
+pip install -r requirements.txt
+pytest                                   # 全部测试
+pytest --cov=app --cov-report=term-missing   # 覆盖率
+```
+
+### 老人端（elder-agent）
+
+```bash
+cd elder-agent
+pip install -r requirements.txt
+pytest                                   # 全部测试
+pytest --cov=src --cov-report=term-missing   # 覆盖率
+```
+
+### 家属端小程序（family-miniapp，utils 逻辑测试）
+
+```bash
+cd family-miniapp
+node --test                              # 使用 Node 内置测试器，无需安装依赖
+```
+
+> 测试文件：云端 `cloud-server/tests/`、老人端 `elder-agent/tests/`、小程序 `family-miniapp/tests/`。
+> 验收口径见 [AGENTS.md](./AGENTS.md)「测试规范」与「开发实施计划」。
+
 ## API 接口
 
 | 接口 | 方法 | 说明 | 鉴权 |

@@ -57,3 +57,14 @@ logs/
 # Temporary
 tmp/
 temp/
+
+# Coverage / test artifacts
+.coverage
+htmlcov/
+.coverage.*
+coverage.xml
+
+# OpenCode
+.opencode/sessions/
+.opencode/cache/
+.opencode/*.log

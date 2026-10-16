@@ -1,0 +1,9 @@
+{
+  "name": "family-miniapp-tests",
+  "version": "0.1.0",
+  "private": true,
+  "description": "银发守护家属端小程序 - utils 逻辑测试（Node 内置 test 运行器，无需安装依赖）",
+  "scripts": {
+    "test": "node --test"
+  }
+}
