@@ -4,10 +4,17 @@ cloud-server 测试基座
 - 提供 TestClient 与建表/清表 fixture
 """
 import os
+import sys
 
 # 必须在导入 app 之前设置，config.Settings 在模块导入时即读取这些值
 os.environ.setdefault("DATABASE_URL", "sqlite:///./test_elderguard.db")
 os.environ.setdefault("SECRET_KEY", "test-secret-key-only-for-tests")
+
+# 端云集成测试复用老人端 src 包（P6）：把 elder-agent 父目录加入 sys.path，
+# 使 `import src`（src 是 elder-agent 内部的包）可解析。
+_SRC_PARENT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "elder-agent"))
+if _SRC_PARENT not in sys.path:
+    sys.path.insert(0, _SRC_PARENT)
 
 import pytest
 from fastapi.testclient import TestClient

@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.core.config import settings
-from app.routers import auth, tasks, alerts, elder, privacy
+from app.routers import auth, tasks, alerts, elder, privacy, edge
 
 app = FastAPI(
     title="银发守护 Agent 中枢服务",
@@ -33,6 +33,7 @@ app.include_router(tasks.router, prefix="/api/v1/tasks", tags=["任务"])
 app.include_router(alerts.router, prefix="/api/v1/alerts", tags=["告警"])
 app.include_router(elder.router, prefix="/api/v1/elder", tags=["老人"])
 app.include_router(privacy.router, prefix="/api/v1/privacy", tags=["隐私"])
+app.include_router(edge.router, prefix="/api/v1/edge", tags=["边缘接入"])
 
 
 @app.get("/health")

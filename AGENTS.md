@@ -613,6 +613,21 @@ python src/main.py
 
 **验收指标**：端云集成测试全绿；**高危告警送达 ≤10s 且不丢失（KK01）**；任务同步生效；授权联动生效。
 
+**P6 进度（2026-10-16，已交付并通过验收）**：
+- ✅ **云端边缘接入路由**：新增 `cloud-server/app/routers/edge.py`（前缀 `/api/v1/edge`）—— `POST /alerts`（老人端上报告警写入 AlertLog，FR-SC-05）、`GET /tasks`（拉取激活任务，FR-FL-06）、`GET /settings`（拉取设置，FR-FL-08）、`GET /privacy`（拉取授权状态，FR-CM-05）。`main.py` 注册。
+- ✅ **老人端云端集成模块**：新增 `elder-agent/src/integration/edge.py` —— `EdgeClient`（上报告警/拉取任务/设置/授权，httpx 可注入）；`EdgeReporter`（告警上报失败本地缓存 + 重试队列，**重试 ≤3 次（KK01）**，最终失败有记录）。
+- ✅ P6-1 告警上报与推送：老人端上报告警 → 云端写 AlertLog（端云链路，EdgeClient 经 httpx ASGITransport 走真实云端 app 验证）。
+- ✅ P6-2 任务同步下发：家属端配置任务 → 云端 → 老人端拉取 → ReminderPlugin 执行记录（FR-FL-06）。
+- ✅ P6-3 设置同步：老人端拉取 elder 设置（含 privacy_enabled）（FR-FL-08）。
+- ✅ P6-4 授权状态联动：家属端改授权 → 老人端拉取 → 本地 PrivacyGuard 联动 → **关闭授权后 ASR 采集 0 次**（FR-CM-05/AQ02）。
+- ✅ P6-5 断网重试：`EdgeReporter` 失败入队、逐次 flush、耗尽记失败；**重试次数 ≤3（KK01）**。
+- ✅ **验收通过（GUI 真实用户会话验证）**：云端 pytest **76/76 通过**（P0 9 + P1 20 + P2 18 + P3 19 + **P6 10**），覆盖率 **97%**；老人端 pytest **58/58 通过**（P5 51 + **P6 7**），覆盖率 **84%**。
+- 🎯 关键验收点：① **高危告警送达 ≤10s（KK01）**（`test_report_alert_within_10s`）；② 告警写日志（不丢失）；③ 任务同步老人端执行；④ 关闭授权→边缘采集 0 次（AQ02）。
+- 🧪 新增测试：云端 `tests/test_edge_api.py`(5) + `tests/test_edge_integration.py`(5，端云链路)；老人端 `tests/test_edge_client.py`(7)。
+- 🔧 **过程中修复真实缺陷（测试基座）**：端云集成测试跨工程 import 老人端 `src` —— 最初误把 `elder-agent/src` 本身加入 sys.path，但 `src` 是 `elder-agent` 内部的包，须把**父目录 `elder-agent`** 加入 path 才能 `import src`。已修正 `cloud-server/tests/conftest.py` 与 `pytest.ini`（`pythonpath = .;../elder-agent`）。
+- 📊 老人端新增模块：`src/integration/edge.py` 73%（未覆盖为 httpx 实际网络路径与异常分支），整体维持 84%。
+- 🖥️ 复跑命令（本机终端）：云端 `cd /d D:\competition\ElderGuard\cloud-server && D:\Environment\Python312\python.exe -m pytest -q`；老人端 `cd /d D:\competition\ElderGuard\elder-agent && D:\Environment\Python312\python.exe -m pytest -q`。
+
 ### 阶段 P7 — 家属端微信小程序页面（P0）
 
 **目标**：完成家属端小程序 P0 页面与鉴权请求封装。
