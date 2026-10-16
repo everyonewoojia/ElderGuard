@@ -743,6 +743,19 @@ python src/main.py
 
 **验收指标**：全套测试绿；P0 功能验收标准（§7.2.1）全部满足；P1 说明模拟边界；硬约束（§7.4）满足；答辩可演示核心闭环。
 
+**P10 进度（2026-10-16，已交付并通过验收）**：
+- ✅ **P10-1 并发与性能**：云端新增 `tests/test_p10_quality.py` —— **≥100 家庭并发接入 + 行级隔离（XN02）**（ThreadPoolExecutor 16 并发，每户仅见自己老人，无串号/越权泄漏）；AQ04 并发写入 id 唯一无覆盖。
+- ✅ **P10-2 可靠性**：老人端持续待机模拟（KK02，300 轮事件计数精确、200 任务调度无遗漏）；云端 KY02 数据库备份恢复（复制 db → 新引擎读回原数据）。
+- ✅ **P10-3 安全合规**：老人端 **CON-B-01/CON-L-06 无医疗诊疗建议**（求助话术断言不含“诊断为/患病/需要治疗/剂量/用药建议/去医院看”，须含“家属/通知”导向）；AQ02 未授权采集 0 次回归；AQ01 越权 403 回归。
+- ✅ **P10-4 P0 全量回归**：三端全量测试套件全绿 —— **老人端 pytest 88/88（覆盖率 86%）**、**云端 pytest 98/98（覆盖率 97%）**、**小程序 Node 12/12**。
+- ✅ **P10-5 文档与答辩交付**：更新 README（质量验收/模拟边界/答辩要点/完整 API 表/测试命令）；新增 `docs/答辩演示脚本.md`（演示流程）与 `docs/答辩交付材料.docx`（Word 成品，含封面/目录/正文/表格，audit 通过、目录已生成）。
+- 🎯 关键验收点：XN02 100 户并发隔离、AQ01/AQ02 回归、KK01 告警送达 ≤10s 不丢失、KK02 待机无事件丢失、KY01 断网降级+恢复补发、KY02 备份恢复、CON-B/L 无医疗诊疗建议。
+- 🧪 新增测试：老人端 `tests/test_p10_quality.py`(8)；云端 `tests/test_p10_quality.py`(4)。
+- 🔧 修复真实缺陷（测试侧）：① `GET /elder` 直接返回 JSON 数组（response_model=List），测试误取 `r.json()["data"]` → 改按 list 断言；② KY02 在 `db.close()` 后访问 `elder.id` 触发 DetachedInstanceError → 关闭前先取 `elder_id`。
+- 📊 老人端覆盖率 86%（privacy 96%、edge 74%；`main.py` 0% 入口脚本、`base.py` 76% 抽象基类，属非点名不改）；云端 97%（617 语句 18 未覆盖，全为越权分支细节/httpx 网络路径）。
+- ⏭️ 模拟边界（答辩口径）：AI 外部 API 兜底、视觉/通话模拟、断网缓存内存级、小程序 mock 逻辑测试（无 miniprogram-automator）；渲染校验因缺 PyMuPDF/WPS 通道跳过，Word 以 audit 结构校验为准。
+- 🖥️ 复跑命令（本机终端）：云端 `cd /d D:\competition\ElderGuard\cloud-server && D:\Environment\Python312\python.exe -m pytest --cov=app --cov-report=term-missing`（98 passed）；老人端 `cd /d D:\competition\ElderGuard\elder-agent && ... --cov=src ...`（88 passed）；小程序 `cd /d D:\competition\ElderGuard\family-miniapp && node --test tests/api.test.js tests/pages.test.js`（12 passed）。
+
 ### 阶段间横切要求
 
 

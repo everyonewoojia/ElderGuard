@@ -32,6 +32,7 @@ elder-agent/.env
 elder-agent/*.db
 elder-agent/audio/
 elder-agent/models/
+elder-agent/data/
 
 # Family Miniapp
 family-miniapp/node_modules/
