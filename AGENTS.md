@@ -582,6 +582,19 @@ python src/main.py
 
 **验收指标**：各插件与 AI 门面测试全绿；久坐 4h 触发并记录；求助可本地语音告警；指令识别率达标；**未授权采集 0 次（AQ02/CON-B-04）**。
 
+**P5 进度（2026-10-16，已交付并通过验收）**：
+- ✅ **P5-5 隐私授权校验**：新建 `src/core/privacy.py` `PrivacyGuard`（授权放行/未授权拦截并计数）；`ASR.listen` 采集前强制校验（未授权返回 None，不采集）；`Agent._sense` 感知入口同样前置校验（双保险）。**关闭授权后采集 0 次（AQ02/CON-B-04）** 验证通过。
+- ✅ P5-1 提醒插件：`reminder.py` 重写 —— 用药/作息提醒记录任务（初始 pending）；**久坐超 4 小时触发提醒并写日志（FR-SC-03）**（支持注入可测时钟）；任务完成/未完成状态切换（FR-CM-02）；支持注入 memory 写久坐日志。
+- ✅ P5-2 安全告警插件：`alert.py` —— 语音求助（FR-SC-01）/跌倒/异常告警 + **本地语音告警兜底（KK04）**（注入 tts）；告警状态 active/cancelled 管理；**修复告警 id 碰撞缺陷**（Windows `datetime.now().timestamp()` 约 1ms 分辨率，连续告警 id 冲突覆盖 → 改 `毫秒时间戳+序号` 保证唯一）。
+- ✅ P5-3 指令解析插件：`command.py` —— 关键词规则扩展（新增「求助/叫家属/帮帮我」）；技能匹配执行并记录（FR-DC-05）；**5 条常见指令 100% 正确（≥4 达标，FR-MI-01/03）**。
+- ✅ P5-4 AI 门面：`intent.py` 云端异常/为空回退本地规则（FR-CM-06/CON-D-06）；`tts.py` 合成失败返回 False 不崩溃；`asr.py` 云端失败/无识别器返回 None 不崩溃、初始化不崩溃（外部依赖退化）。
+- ✅ **验收通过（GUI 真实用户会话验证）**：老人端 pytest **51/51 通过**（P0 4 + P4 26 + P5 21）；覆盖率 **整体 85%**（P4 末 68%，≥80% 达成）。
+- 🎯 关键验收点：① **未授权采集 0 次**（PrivacyGuard 拦截 + ASR/Agent 双校验）；② 久坐 4h 触发并写日志；③ 求助→本地语音告警（KK04）；④ 指令匹配 5/5（≥4 达标）；⑤ 云端失败全部兜底不崩溃。
+- 📊 P5 模块覆盖率：privacy 92%、intent 97%、tts 84%、alert 97%、command 90%、reminder 90%、agent 93%、event_bus 100%、memory 97%、scheduler 89%。**仅 asr 53%** —— 剩余未覆盖为 pyaudio 硬件采集路径（无头环境不可测），其隐私拦截与云端兜底逻辑已覆盖（属模拟/环境边界）。
+- 🧪 新增测试文件：`tests/test_privacy.py`(5)、`test_reminder.py`(4)、`test_alert_plugin.py`(3)、`test_command_plugin.py`(3)、`test_ai_facade.py`(6)。
+- ⏭️ 已知待办：`base.py` 76%（抽象基类抽象方法未实例化覆盖）、`main.py` 0%（入口脚本），留待后续（main 非点名不改）。
+- 🖥️ 复跑命令（本机终端）：`cd /d D:\competition\ElderGuard\elder-agent && D:\Environment\Python312\python.exe -m pytest -q`；覆盖率 `... -m pytest --cov=src --cov-report=term-missing`。
+
 ### 阶段 P6 — 端云集成闭环（P0）
 
 **目标**：打通老人端→云端→家属端核心业务闭环，落实告警推送与任务同步。

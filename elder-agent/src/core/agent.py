@@ -16,6 +16,7 @@ from src.ai.tts import TTSService
 from src.ai.intent import IntentService
 from src.core.event_bus import EventBus
 from src.core.memory import MemoryManager
+from src.core.privacy import PrivacyGuard
 from src.plugins.reminder import ReminderPlugin
 from src.plugins.alert import AlertPlugin
 from src.plugins.command import CommandPlugin
@@ -36,17 +37,19 @@ class ElderAgent:
         asr: Optional[ASRService] = None,
         tts: Optional[TTSService] = None,
         intent: Optional[IntentService] = None,
+        privacy: Optional[PrivacyGuard] = None,
     ):
         self.event_bus = event_bus or EventBus()
         self.memory = memory or MemoryManager()
         self.asr = asr or ASRService()
         self.tts = tts or TTSService()
         self.intent = intent or IntentService()
+        self.privacy = privacy or PrivacyGuard()
 
         self.plugins = [
-            ReminderPlugin(self.event_bus),
-            AlertPlugin(self.event_bus),
-            CommandPlugin(self.event_bus),
+            ReminderPlugin(self.event_bus, memory=self.memory),
+            AlertPlugin(self.event_bus, tts=self.tts),
+            CommandPlugin(self.event_bus, tts=self.tts),
         ]
 
         self._running = False
@@ -85,7 +88,9 @@ class ElderAgent:
                 await asyncio.sleep(1)
 
     async def _sense(self):
-        """感知模块 - 采集语音输入"""
+        """感知模块 - 采集语音输入（执行前强制校验隐私授权，P5-5）"""
+        if not self.privacy.check("audio"):
+            return
         audio_data = await self.asr.listen()
         if audio_data:
             text = await self.asr.recognize(audio_data)
