@@ -6,7 +6,7 @@
       <text>启用隐私授权</text>
     </view>
   </view>
-  
+
   <view class="card">
     <view class="card-title">通知设置</view>
     <view class="card-content">
@@ -14,6 +14,19 @@
       <text>启用告警通知</text>
     </view>
   </view>
-  
+
+  <view class="card">
+    <view class="card-title">新增提醒任务</view>
+    <view class="card-content">
+      <picker mode="selector" range="{{['用药', '作息', '久坐提醒']}}" bindchange="onTaskTypeChange" value="{{taskTypeIndex}}">
+        <view>任务类型：{{taskTypeLabels[taskTypeIndex]}}</view>
+      </picker>
+      <input class="input" placeholder="任务标题（如：服药）" bindinput="onTaskInput" data-field="title" />
+      <input class="input" placeholder="内容（如：早饭后一粒）" bindinput="onTaskInput" data-field="content" />
+      <input class="input" placeholder="提醒时间（如 08:00）" bindinput="onTaskInput" data-field="schedule_time" />
+      <button class="btn-primary mt-20" bindtap="addTask">添加任务</button>
+    </view>
+  </view>
+
   <button class="btn-danger mt-20" bindtap="logout">退出登录</button>
 </view>

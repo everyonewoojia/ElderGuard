@@ -2,12 +2,27 @@
   <view class="card">
     <view class="card-title">老人信息</view>
     <view class="card-content">
-      <view>姓名：{{elder.name}}</view>
-      <view>年龄：{{elder.age}}</view>
-      <view>状态：{{elder.status}}</view>
+      <block wx:if="{{elder}}">
+        <view>姓名：{{elder.name}}</view>
+        <view>年龄：{{elder.age}}</view>
+        <view>状态：在线</view>
+      </block>
+      <view wx:else class="text-center">暂无绑定老人</view>
     </view>
   </view>
-  
+
+  <view class="card">
+    <view class="card-title">今日提醒</view>
+    <view class="card-content">
+      <block wx:if="{{tasks.length > 0}}">
+        <view wx:for="{{tasks}}" wx:key="id">
+          {{item.title}}（{{item.is_active ? '进行中' : '已停用'}}）
+        </view>
+      </block>
+      <view wx:else class="text-center">暂无提醒任务</view>
+    </view>
+  </view>
+
   <view class="card">
     <view class="card-title">今日活动</view>
     <view class="card-content">
@@ -16,14 +31,14 @@
       <view>久坐时长：{{stats.sedentary}}</view>
     </view>
   </view>
-  
+
   <view class="card">
     <view class="card-title">最近告警</view>
     <view class="card-content" wx:for="{{alerts}}" wx:key="id">
-      <view>{{item.type}} - {{item.time}}</view>
+      <view>{{item.alert_type}}（{{item.status}}） - {{item.created_at}}</view>
     </view>
     <view wx:if="{{alerts.length === 0}}" class="text-center">暂无告警</view>
   </view>
-  
+
   <button class="btn-primary" bindtap="goToDetail">查看详情</button>
 </view>

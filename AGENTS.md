@@ -646,6 +646,21 @@ python src/main.py
 
 **验收指标**：小程序页面测试（miniprogram-automator 或 mock）通过；未登录跳转登录；仅能查看绑定老人数据（越权 0 次，AQ01）。
 
+**P7 进度（2026-10-16，已交付并通过验收）**：
+- ✅ **P7-0 后端补口**：`elder.py` 新增 `GET /api/v1/elder`（列出当前家属绑定的全部老人，复用 P1 `storage.list_elders_by_owner`，越权 0 次）。—— 前端要「仅显示绑定老人数据」，此前只有 `GET /elder/{id}`（需 id）导致只能硬编码 elder_id=1；补口后前端登录即拿绑定列表。
+- ✅ P7-1 请求封装：`utils/api.js`（P0 已有，携带 token/401 跳转/统一错误）保持；页面统一复用其请求（消除各页手写 header/401）。
+- ✅ P7-2 登录页：**契约修正** —— 后端 `/auth/login` 用 `OAuth2PasswordRequestForm`（表单），前端原发 JSON 会 422 → 改为 `application/x-www-form-urlencoded` 提交；空输入 toast / 成功存 token + switchTab / 失败 toast。
+- ✅ P7-3 首页：复用 api.js；**无 token → 跳登录（未绑定不可查看，AQ01）**；`GET /elder` 取绑定老人（首个）；`GET /tasks` 展示提醒完成情况（FR-FL-02）；`GET /alerts` 最近告警。
+- ✅ P7-4 告警记录页：**修正错误端点** —— 原 `GET /alerts/1`（非契约端点）→ `GET /alerts`（列表）；取消告警 `POST /alerts/{id}/cancel` 后刷新（FR-FL-03）。
+- ✅ P7-5 设置页：绑定 elder 获取（`GET /elder`）；隐私开关 `POST /privacy/auth {elder_id,enabled}`（FR-CM-05）；**新增提醒任务 `POST /tasks`（FR-FL-05）**（类型选择 medication/rest/sedentary + 标题/内容/时间）；通知开关（FR-FL-07 P1 本地）；退出登录。
+- ✅ **验收通过（GUI 真实用户会话验证）**：小程序 Node 测试 **12/12 通过**（P7-1 api 4 + P7-2 login 3 + P7-3 index 2 + P7-4 alerts 2 + P7-5 settings 1）；云端 pytest **78/78 通过**（P6 76 + P7 2），覆盖率 **97%**（`elder.py` 100%，新增 list_elders 已覆盖）。
+- 🎯 关键验收点：① 未登录跳转登录（AQ01 前端守卫）；② **仅显示绑定老人数据**（前端经 `GET /elder` 取绑定列表，不再硬编码 elder_id=1）；③ 端点对齐后端契约（alerts/tasks/privacy/elder）；④ 设置页可新增提醒任务（FR-FL-05）。
+- 🧪 测试文件：`family-miniapp/tests/pages.test.js`（mock Page/getApp/wx 运行时加载各页面 js 断言 URL/token/setData/跳转）；云端 `tests/test_api_elder.py` 新增 2 条。
+- 🔧 过程中修复（真实契约缺陷）：① alerts 错误端点 `/alerts/1` → `/alerts`；② 页面硬编码 `elder_id=1` → 经 `GET /elder` 动态取；③ login 非表单导致后端 OAuth2 422 → 改表单提交；④ settings 原无提醒任务新增 → 补齐。
+- 🧪 测试运行器修复：`node --test tests/` 在 node v24 把目录当模块 → 改为 `node --test tests/api.test.js tests/pages.test.js`。
+- ⏭️ 模拟边界：小程序用 **mock API 逻辑测试**（Node），未接入 miniprogram-automator（本机无微信开发者工具自动化环境）；wxml 为静态模板，逻辑正确性以 js 测试为准。
+- 🖥️ 复跑命令（本机终端）：`cd /d D:\competition\ElderGuard\family-miniapp && node --test tests/api.test.js tests/pages.test.js`；云端 `cd /d D:\competition\ElderGuard\cloud-server && D:\Environment\Python312\python.exe -m pytest -q`（78 passed）。
+
 ### 阶段 P8 — P1 能力扩展（允许部分模拟）
 
 **目标**：实现 P1 能力，允许模拟逻辑并说明模拟边界。

@@ -14,8 +14,8 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.models.models import Elder
-from app.routers.deps import get_bound_elder
+from app.models.models import Elder, User
+from app.routers.deps import get_bound_elder, get_current_family
 from app.services import storage
 
 router = APIRouter()
@@ -39,6 +39,19 @@ class LogResponse(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+@router.get("", response_model=List[ElderResponse])
+async def list_elders(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_family),
+):
+    """列出当前家属绑定的全部老人（仅本人数据，越权 0 次）。
+
+    P7 家属端前端需在登录后获取绑定老人列表（用于首页 / 设置页），
+    复用数据层 storage.list_elders_by_owner（P1 越权隔离前置）。
+    """
+    return storage.list_elders_by_owner(db, current_user.id)
 
 
 @router.get("/{elder_id}", response_model=ElderResponse)
