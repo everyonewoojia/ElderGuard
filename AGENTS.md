@@ -551,6 +551,19 @@ python src/main.py
 
 **验收指标**：事件总线 / 调度器 / 记忆 / 闭环测试全绿；插件异常隔离生效；**唤醒响应 ≤2s**；新增插件不改内核代码。
 
+**P4 进度（2026-10-16，已交付并通过验收）**：
+- ✅ P4-1 事件总线：改造 `event_bus.py` —— `publish(*events)` 按 priority（P0>P1>P2）排序优先分发；单订阅者异常隔离（KK04，`_dispatch` try/except）；订阅/取消/查询保留。
+- ✅ P4-2 任务调度器：新建 `src/core/scheduler.py`（`TaskScheduler`）—— 按 priority 风险分级入队排序，`next()`/`run_next()` 取最高优先级；`size()`/`clear()`。
+- ✅ P4-3 记忆管理：`memory.py` 短期记忆改硬上限 50（原逻辑超 100 才裁剪、会复涨）；长期档案（偏好/历史）持久化——**新实例重建可读（FR-DC-06）**验证通过。
+- ✅ P4-4 Agent 闭环骨架：`agent.py` 支持依赖注入（event_bus/memory/asr/tts/intent）；新增 `handle_voice_text` 完整闭环入口（理解→规划→执行→反馈→记忆）；`_feedback_from_intent` 按意图给话术；修复 `datetime.utcnow()` 弃用。
+- ✅ P4-5 插件统一接口：`BasePlugin` 抽象契约保持；测试新增自定义插件经总线加载、无需改内核（XG01）。
+- ✅ **验收通过（GUI 真实用户会话验证）**：老人端 pytest **30/30 通过**（P0 4 + P4 26）；覆盖率 —— **核心模块全部 ≥80%**：event_bus 100%、memory 97%、scheduler 89%、agent 93%、alert 90%。
+- 🎯 关键验收点：① 插件异常隔离生效（一个订阅者抛异常不中断其他）；② 优先级分发 P0→P1→P2；③ 记忆重启后仍可读；④ **唤醒响应 ≤2s**（`test_wakeup_response_within_2s`）；⑤ 新增插件不改内核。
+- ℹ️ 老人端整体覆盖率 68%（未含 P5 范围模块：ai 门面 asr 29%/intent 36%/tts 56%、reminder 47%、command 39%、main 0%），这些将在 **P5** 补齐到 ≥80%。
+- 🔧 过程中修复：`memory.py` 短期记忆硬上限；`alert.py` `datetime.utcnow()` 弃用告警清理（2 处）。
+- 🧪 测试文件：`tests/test_event_bus.py`(6)、`test_scheduler.py`(4)、`test_memory.py`(4)、`test_plugin_interface.py`(2)、`test_agent.py`(10)。
+- 🖥️ 复跑命令（本机终端）：`cd /d D:\competition\ElderGuard\elder-agent && D:\Environment\Python312\python.exe -m pytest -q`；覆盖率 `... -m pytest --cov=src --cov-report=term-missing`。
+
 ### 阶段 P5 — 老人端插件与 AI 门面（P0）
 
 **目标**：实现提醒、安全告警、指令解析三类插件与 AI 能力门面，并落实隐私授权硬约束。

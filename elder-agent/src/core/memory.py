@@ -38,8 +38,9 @@ class MemoryManager:
     async def save(self, event: dict):
         """保存事件到记忆"""
         self.short_term.append(event)
-        
-        if len(self.short_term) > 100:
+
+        # 短期记忆硬上限：超过 50 条只保留最近 50 条（避免无界增长）
+        if len(self.short_term) > 50:
             self.short_term = self.short_term[-50:]
         
         self.long_term["history"].append({

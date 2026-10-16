@@ -2,7 +2,7 @@
 安全告警插件 - 跌倒、求助、异常事件告警
 """
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 from src.plugins.base import BasePlugin
 
@@ -60,10 +60,10 @@ class AlertPlugin(BasePlugin):
     
     async def _send_alert(self, alert_type: str, event: dict):
         """发送告警"""
-        alert_id = f"alert_{datetime.utcnow().timestamp()}"
+        alert_id = f"alert_{datetime.now(timezone.utc).timestamp()}"
         self._active_alerts[alert_id] = {
             "type": alert_type,
             "status": "active",
-            "created_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
         }
         logger.info(f"已发送{alert_type}告警: {alert_id}")
