@@ -714,6 +714,17 @@ python src/main.py
 
 **验收指标**：P2 抽象接口定义完整、可导入、契约测试通过，不要求完整编码实现。
 
+**P9 进度（2026-10-16，已交付并通过验收）**：
+- ✅ **P9-1 硬件适配抽象接口（老人端）**：新增 `src/plugins/hardware.py` `HardwareAdapter`（抽象基类：`init/start/stop/read_event`，毫米波雷达 / 穿戴设备统一接入，FR-CM-07）。
+- ✅ **P9-2 社区后台对接接口（云端）**：新增 `app/services/community.py` `CommunityBackend`（抽象：`push_alert` / `sync_status`，FR-SC-10）。
+- ✅ **P9-3 情绪识别插件接口（老人端）**：新增 `src/plugins/emotion.py` `EmotionPlugin`（继承 `BasePlugin` 生命周期 + 抽象 `recognize_emotion`，FR-CM-08）。
+- ✅ **P9-4 多模态融合 / 批量存储接口**：老人端新增 `src/ai/multimodal.py` `MultimodalFacade`（抽象 `fuse`，FR-CM-10）；云端新增 `app/services/batch_storage.py` `BatchStorage`（抽象 `batch_upsert` / `flush`，M-DATA-05）。
+- ✅ **验收通过（GUI 真实用户会话验证）**：老人端 pytest **80/80 通过**（P8 72 + P9 8），覆盖率 **整体 86%**（hardware 100%、emotion 100%、multimodal 100%）；云端 pytest **94/94 通过**（P8 88 + P9 6），覆盖率 **97%**（community 100%、batch_storage 100%）。
+- 🎯 关键验收点：① 抽象基类**不可直接实例化**（契约强制实现）；② 实现全部抽象方法的子类**可实例化并可用**；③ 契约方法齐全（hasattr 校验）；④ 可导入无异常。P2 口径：仅抽象接口，不完整编码。
+- 🧪 新增测试：老人端 `tests/test_p9_abstract_interfaces.py`(8)；云端 `tests/test_p9_abstract_interfaces.py`(6)。
+- ⏭️ 无缺陷修复（纯接口预留）；老人端 `main.py` 0%（入口脚本）、`base.py` 76% 仍留待 P10。
+- 🖥️ 复跑命令（本机终端）：老人端 `cd /d D:\competition\ElderGuard\elder-agent && D:\Environment\Python312\python.exe -m pytest --cov=src --cov-report=term-missing`（80 passed）；云端 `cd /d D:\competition\ElderGuard\cloud-server && D:\Environment\Python312\python.exe -m pytest --cov=app --cov-report=term-missing`（94 passed）。
+
 ### 阶段 P10 — 质量属性验收与答辩交付
 
 **目标**：完成质量场景可执行验收，输出 P0 全量回归与答辩材料。
