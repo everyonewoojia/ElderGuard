@@ -681,6 +681,22 @@ python src/main.py
 
 **验收指标**：P1 各功能测试通过（模拟项标注模拟边界）；重试≤3 次；取消后不重复推送；清理不影响核心日志。
 
+**P8 进度（2026-10-16，已交付并通过验收）**：
+- ✅ **P8-1 WebSocket 实时推送（云端）**：新增 `services/ws_manager.py`（`WSManager` 单例 manager：user_id→连接集合，`push_to_user` 单连接失败不中断）；新增 `routers/ws.py`（`GET /api/v1/ws/alerts?token=<JWT>`：query token 鉴权无效→close 4401；连接即补推未确认 pending 告警；持续 receive 心跳；`WebSocketDisconnect`/异常均摘除连接）；`main.py` 注册 `/api/v1` 前缀。
+- ✅ **P8-2 告警重试模块（云端）**：新增 `services/push_retry.py` `PushRetryService`（同步 `push` + 异步 `apush`，支持 async/sync sender；**重试 ≤3 次**，最终失败记入 `failures`）；`edge.py` POST /alerts 写日志后经 `PushRetryService(sender=manager.push_to_user)` 向 elder.owner_id 推送（FR-SC-05/06）。
+- ✅ **P8-3 主动陪伴插件（老人端）**：新增 `src/plugins/companion.py` `CompanionPlugin` —— 回复规则命中关键词时引用最近记忆实现**多轮记忆衔接**；姓名偏好进入问候；每轮对话写记忆（FR-DC-08，注入 memory 可测）；修复规则含「降压药」等词时命不中「吃药」→ 规则补「药」。
+- ✅ **P8-4 视觉行为识别接口（老人端）**：新增 `src/ai/vision.py` `VisionService` —— 行为识别模拟 `detect/confirm/check_timeout`；**疑似跌倒 10 秒无应答触发告警回调（FR-SC-04）**；修复 `on_alert` 为同步函数时 `await` 报错 → 用 `asyncio.iscoroutine` 判断同步/异步回调（FR-SC-02，视觉模拟边界）。
+- ✅ **P8-5 误告警手动取消（云端）**：`storage.py` 新增 `list_pending_alerts_by_owner`（**仅 status=pending**，取消/已通知不进入待推送）；`routers/ws.py` 补推只用 pending → **取消后不重复推送（KK03）**；取消后日志保留（status=cancelled）。
+- ✅ **P8-6 日志定期清理（云端）**：`storage.py` 新增 `cleanup_old_monitor_logs(db, cutoff)`（只删 MonitorLog 老旧日志、**不碰 AlertLog**，返回删除数，FR-CM-09）。
+- ✅ **P8-7 跌倒语音通话（老人端）**：新增 `src/ai/call.py` `CallService` —— 模拟通话 `connect/disconnect`；**空目标明确失败返回 False（FR-SC-07，通话模拟边界）**；远程语音呼叫接口（FR-FL-04 模拟）。
+- ✅ **验收通过（GUI 真实用户会话验证）**：老人端 pytest **72/72 通过**（P5 51 + P8 21），覆盖率 **整体 85%**（P5 末 85%）；云端 pytest **88/88 通过**（P7 78 + P8 10），覆盖率 **97%**（P7 末 97%）。
+- 🎯 关键验收点：① **重试 ≤3 次（KK01）**且失败有记录；② **取消后不重复推送（KK03）**、日志保留；③ WS 连接补推 pending + 实时推送新告警；④ 疑似跌倒 10 秒无应答进入告警（FR-SC-04）；⑤ 记忆多轮衔接；⑥ 清理不影响核心日志与告警。
+- 🧪 新增测试：老人端 `tests/test_companion_plugin.py`(5)、`test_vision.py`(5)、`test_call.py`(4)；云端 `tests/test_push_retry.py`(4)、`test_cleanup.py`(2)、`test_ws.py`(4)。
+- 🔧 修复真实缺陷：① companion 规则命不中「降压药」→ 补「药」关键词；② `vision.check_timeout` 对同步 on_alert 回调 `await None` → `asyncio.iscoroutine` 兼容；③ `test_cleanup` 在 `delete(synchronize_session=False)` 后访问被删对象 id → 删除前先取 id（测试侧）。
+- 📊 老人端新模块：companion 87%、vision 97%、call 100%；云端新模块：push_retry 95%、ws 93%、ws_manager 89%、edge 94%；仅 asr 53%（pyaudio 硬件路径不可测，属模拟边界）。
+- ⏭️ 已知待办：老人端 `main.py` 0%（入口脚本）、`base.py` 76%；云端 `alerts.py` 42 行 1 未覆盖（`GET /alerts/{id}` 越权分支细节），留待后续；`httpx2` StarletteDeprecationWarning（无害）。
+- 🖥️ 复跑命令（本机终端）：老人端 `cd /d D:\competition\ElderGuard\elder-agent && D:\Environment\Python312\python.exe -m pytest --cov=src --cov-report=term-missing`（72 passed）；云端 `cd /d D:\competition\ElderGuard\cloud-server && D:\Environment\Python312\python.exe -m pytest --cov=app --cov-report=term-missing`（88 passed）。
+
 ### 阶段 P9 — P2 接口预留
 
 **目标**：仅定义抽象接口，不完整编码。

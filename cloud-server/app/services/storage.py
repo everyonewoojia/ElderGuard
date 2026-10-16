@@ -208,6 +208,22 @@ def list_alerts_by_owner(db: Session, owner_id: int) -> List[AlertLog]:
     )
 
 
+def list_pending_alerts_by_owner(db: Session, owner_id: int) -> List[AlertLog]:
+    """按家属 owner 查询待推送（status=pending）的告警（P8-1 WS 补推 / P8-5）。
+
+    已取消（cancelled）/已通知（notified）的告警不进入待推送，保证「取消后不重复推送」。
+    """
+    elder_ids = [e.id for e in list_elders_by_owner(db, owner_id)]
+    if not elder_ids:
+        return []
+    return (
+        db.query(AlertLog)
+        .filter(AlertLog.elder_id.in_(elder_ids), AlertLog.status == "pending")
+        .order_by(AlertLog.id)
+        .all()
+    )
+
+
 def update_alert_status(db: Session, alert_id: int, status: str) -> Optional[AlertLog]:
     """更新告警状态；切到 notified 时记录通知时间。"""
     alert = get_alert(db, alert_id)
@@ -243,3 +259,22 @@ def create_log(
 def list_logs_by_elder(db: Session, elder_id: int) -> List[MonitorLog]:
     """按 elder 归属查询监护日志（越权隔离前置）。"""
     return db.query(MonitorLog).filter(MonitorLog.elder_id == elder_id).all()
+
+
+# ---------------------------------------------------------------------------
+# 日志定期清理（M-DATA-04 / FR-CM-09）
+# ---------------------------------------------------------------------------
+
+
+def cleanup_old_monitor_logs(db: Session, cutoff: datetime) -> int:
+    """删除 created_at < cutoff 的老旧监护日志（P8-6）。
+
+    只清理 MonitorLog（不触碰 AlertLog 告警日志与近期日志），返回删除条数。
+    """
+    result = (
+        db.query(MonitorLog)
+        .filter(MonitorLog.created_at < cutoff)
+        .delete(synchronize_session=False)
+    )
+    db.commit()
+    return int(result or 0)

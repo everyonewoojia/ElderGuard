@@ -16,6 +16,8 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.services import storage
+from app.services.push_retry import PushRetryService
+from app.services.ws_manager import manager
 
 router = APIRouter()
 
@@ -28,15 +30,35 @@ class EdgeAlertIn(BaseModel):
     content: Optional[str] = None
 
 
+async def _notify_owner(owner_id: int, payload: dict) -> bool:
+    """向家属推送新告警（P8-1 WS）；推送失败经重试模块（P8-2，≤3 次）。"""
+    retry = PushRetryService(sender=lambda p, t: manager.push_to_user(t, p))
+    return await retry.apush(payload, owner_id)
+
+
 @router.post("/alerts")
 async def receive_alert(data: EdgeAlertIn, db: Session = Depends(get_db)):
-    """老人端上报告警：写入告警日志（初始 pending），供家属端查询。"""
+    """老人端上报告警：写入告警日志（初始 pending），并触发 WS 实时推送家属端。"""
     elder = storage.get_elder(db, data.elder_id)
     if elder is None:
         raise HTTPException(status_code=404, detail="老人不存在")
     alert = storage.create_alert(
         db, data.elder_id, data.alert_type, data.priority, data.content
     )
+    # P8-1：实时推送家属端；推送失败进重试队列（P8-2）
+    payload = {
+        "type": "alert",
+        "data": {
+            "id": alert.id,
+            "elder_id": alert.elder_id,
+            "alert_type": alert.alert_type,
+            "priority": alert.priority,
+            "content": alert.content,
+            "status": alert.status,
+            "created_at": alert.created_at.isoformat() if alert.created_at else None,
+        },
+    }
+    await _notify_owner(elder.owner_id, payload)
     return {
         "code": 200,
         "message": "告警已上报",
