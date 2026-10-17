@@ -756,6 +756,15 @@ python src/main.py
 - ⏭️ 模拟边界（答辩口径）：AI 外部 API 兜底、视觉/通话模拟、断网缓存内存级、小程序 mock 逻辑测试（无 miniprogram-automator）；渲染校验因缺 PyMuPDF/WPS 通道跳过，Word 以 audit 结构校验为准。
 - 🖥️ 复跑命令（本机终端）：云端 `cd /d D:\competition\ElderGuard\cloud-server && D:\Environment\Python312\python.exe -m pytest --cov=app --cov-report=term-missing`（98 passed）；老人端 `cd /d D:\competition\ElderGuard\elder-agent && ... --cov=src ...`（88 passed）；小程序 `cd /d D:\competition\ElderGuard\family-miniapp && node --test tests/api.test.js tests/pages.test.js`（12 passed）。
 
+**老人端启动修复（2026-10-16）**：
+- 问题：`python src/main.py` 报 `ModuleNotFoundError: No module named 'src'` —— 以脚本方式运行时 sys.path[0] 指向 `src` 目录本身，`from src.core.agent` 无法解析 `src` 包。
+- 修复（最小变动）：`src/main.py` 顶部将项目根（elder-agent）加入 sys.path，兼容 `python src/main.py` 与 `python -m src.main` 两种启动方式。
+- 验证：老人端 pytest 全量 **90/90 通过**（新增 `tests/test_main_entry.py` 2 条入口导入回归测试）；`python src/main.py` 实际启动正常（提醒/告警/指令插件全部初始化并启动、主循环运行）。无麦克风设备时 asr 采集报 `Errno -9996` 属硬件环境边界，已由 P5 兜底处理不崩溃。
+
+**使用手册交付（2026-10-17）**：
+- ✅ 新增 `docs/使用手册.docx`（Word 成品，含封面/目录/正文/表格，audit 0 错误、目录已更新）：覆盖系统简介、环境准备、部署配置（云端/老人端 `.env` 字段表）、三端启动、小程序页面功能、端到端演示流程、常见问题与模拟边界，回答"如何打开运行本 app"。
+- 🖥️ 复跑验证：使用手册依据项目内 README/AGENTS/.env/代码编写；生成脚本走 python-docx + word skill audit（`E_OOXML_TBLPR_ORDER` 已修复）+ catalogue 目录更新。
+
 ### 阶段间横切要求
 
 

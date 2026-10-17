@@ -3,6 +3,13 @@
 """
 import asyncio
 import logging
+import os
+import sys
+
+# 保证以 `python src/main.py` 或 `python -m src.main` 启动时均能 import src.* 包：
+# 直接把 src 目录当顶层（sys.path[0]=src）会找不到 `src` 模块，需将项目根(elder-agent)加入 sys.path。
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from dotenv import load_dotenv
 
 from src.core.agent import ElderAgent
