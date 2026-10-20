@@ -48,7 +48,7 @@ class CommandPlugin(BasePlugin):
             if command:
                 await self._commands[command](text)
             else:
-                logger.info(f"未匹配到指令: {text}")
+                logger.info("Command unmatched")
 
     def _match_command(self, text: str) -> Optional[str]:
         """匹配指令（关键词规则）"""
