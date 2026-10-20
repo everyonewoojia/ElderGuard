@@ -35,7 +35,7 @@ App({
         return {
           token: this.globalData.token, elderId: this.globalData.currentElderId,
           baseUrl: this.globalData.baseUrl, verified: this.globalData.alertSocketHeaderVerified,
-          apiTrustedHosts: this.globalData.apiTrustedHosts, configuration,
+          apiTrustedHosts: this.globalData.apiTrustedHosts, configuration, session: this._bindingVersion,
           bound: this._boundElders.includes(this.globalData.currentElderId),
         };
       },

@@ -127,6 +127,104 @@ test('WS03/WS06: 4401 stops retries, clears login, ignores old messages', async 
   page.onUnload();
 });
 
+async function loginSameTokenThroughPageAfter4401() {
+  const e = await start();
+  const token = e.app.globalData.token;
+  const old = e.sockets[0];
+  const sessionA = e.app._bindingVersion;
+  const oldTimerCallbacks = [...e.clock.jobs.values()].map((job) => job.fn);
+
+  old.emit('Close', { code: 4401, reason: 'synthetic auth rejection' });
+  const expiredSession = e.app._bindingVersion;
+  assert.ok(expiredSession > sessionA);
+  assert.equal(e.app.globalData.token, '');
+  assert.equal(e.app.alertSocket.status().state, 'auth_failed');
+  e.app.alertSocket.sync();
+  e.app.onShow();
+  e.clock.tick(100000);
+  assert.equal(e.connections.length, 1, 'the rejected session must not reconnect itself');
+
+  e.state.defer = true;
+  const login = e.page('login');
+  login.setData({ phone: 'synthetic-user', password: 'synthetic-password' });
+  login.login();
+  const loginRequest = e.pending.at(-1);
+  assert.equal(loginRequest.url, 'https://contract.invalid/api/v1/auth/login');
+  assert.equal(loginRequest.method, 'POST');
+  assert.equal(loginRequest.header['content-type'], 'application/x-www-form-urlencoded');
+  assert.equal(loginRequest.data, 'username=synthetic-user&password=synthetic-password');
+  loginRequest.success({ statusCode: 200, data: { access_token: token } });
+
+  const sessionB = e.app._bindingVersion;
+  assert.ok(sessionB > expiredSession);
+  const bindingRequest = e.pending.at(-1);
+  assert.notEqual(bindingRequest, loginRequest);
+  assert.equal(bindingRequest.url, 'https://contract.invalid/api/v1/elder');
+  bindingRequest.success({ statusCode: 200, data: e.state.elders });
+  await flush();
+  e.state.defer = false;
+
+  assert.equal(e.app.globalData.token, token);
+  assert.equal(e.app.globalData.currentElderId, 7);
+  assert.equal(e.connections.length, 2, 'a distinct login session may reuse the same opaque token text');
+  const current = e.sockets[1];
+  assert.equal(e.app.alertSocket.status().state, 'connecting');
+  return { e, token, old, oldTimerCallbacks, current, sessionB };
+}
+
+test('WS03/WS06: full login page path reuses token text without inheriting the old session block', async () => {
+  const { e, token, old, oldTimerCallbacks, current } = await loginSameTokenThroughPageAfter4401();
+
+  old.emit('Error', { errMsg: 'synthetic late old error' });
+  old.emit('Close', { code: 1006 });
+  old.closeOptions?.fail({ errMsg: 'synthetic late close failure' });
+  for (const callback of oldTimerCallbacks) callback();
+  assert.equal(e.connections.length, 2);
+  assert.equal(e.app.alertSocket.status().state, 'connecting');
+
+  current.emit('Open');
+  assert.equal(e.app.alertSocket.status().state, 'connected');
+  old.emit('Open');
+  old.emit('Error', { errMsg: 'synthetic late old error after open' });
+  old.emit('Close', { code: 4401 });
+  assert.equal(e.app.globalData.token, token);
+  assert.equal(e.app.alertSocket.status().state, 'connected');
+  assert.equal(e.connections.length, 2);
+  e.app.onHide();
+});
+
+test('WS03/WS06: the replacement session owns its own 4401 block and cannot reconnect', async () => {
+  const { e, old, oldTimerCallbacks, current, sessionB } = await loginSameTokenThroughPageAfter4401();
+  current.emit('Open');
+  assert.equal(e.app.alertSocket.status().state, 'connected');
+
+  current.emit('Close', { code: 4401, reason: 'synthetic replacement auth rejection' });
+  assert.ok(e.app._bindingVersion > sessionB);
+  assert.equal(e.app.globalData.token, '');
+  assert.equal(e.app.globalData.currentElderId, null);
+  assert.equal(e.app.alertSocket.status().state, 'auth_failed');
+  const connections = e.connections.length;
+
+  e.clock.tick(100000);
+  assert.equal(e.connections.length, connections);
+  assert.equal(e.app.alertSocket.status().state, 'auth_failed');
+  old.emit('Open');
+  old.emit('Error', { errMsg: 'synthetic old error after replacement rejection' });
+  old.emit('Close', { code: 4401 });
+  old.closeOptions?.fail({ errMsg: 'synthetic old close after replacement rejection' });
+  for (const callback of oldTimerCallbacks) callback();
+  assert.equal(e.app.globalData.token, '');
+  assert.equal(e.app.alertSocket.status().state, 'auth_failed');
+  assert.equal(e.connections.length, connections);
+
+  e.app.alertSocket.connect();
+  e.app.alertSocket.sync();
+  e.clock.tick(100000);
+  assert.equal(e.app.globalData.token, '');
+  assert.equal(e.connections.length, connections);
+  e.app.onHide();
+});
+
 test('WS06/WS09: elder and account changes isolate callbacks and dedup cache', async () => {
   const e = await start();
   let hits = 0;

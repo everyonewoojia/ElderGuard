@@ -21,7 +21,7 @@ class AlertSocket {
     this.retry = null;
     this.deadline = null;
     this.stable = null;
-    this.blockedToken = null;
+    this.blockedSession = null;
   }
 
   status() {
@@ -88,7 +88,7 @@ class AlertSocket {
   prepare() {
     const next = this.getSession();
     if (next.token !== this.context.token || next.elderId !== this.context.elderId || next.baseUrl !== this.context.baseUrl
-        || next.configuration?.epoch !== this.context.configuration?.epoch) {
+        || next.configuration?.epoch !== this.context.configuration?.epoch || next.session !== this.context.session) {
       this.retire();
       this.listeners.clear();
       this.seen.clear();
@@ -103,10 +103,11 @@ class AlertSocket {
       return null;
     };
     if (typeof next.token !== 'string' || !/^[A-Za-z0-9_.~-]+$/.test(next.token)
+        || !Number.isSafeInteger(next.session) || next.session <= 0
         || !Number.isSafeInteger(next.elderId) || next.elderId <= 0 || next.bound !== true) {
       return denied('idle');
     }
-    if (next.token === this.blockedToken) return denied('auth_failed');
+    if (next.session === this.blockedSession) return denied('auth_failed');
     if (!next.configuration) return denied('unsupported_url');
     // Explicit deployment gate: mocks cannot certify a target WeChat runtime.
     if (next.verified !== true || typeof this.wx.connectSocket !== 'function') return denied('platform_unverified');
@@ -170,7 +171,7 @@ class AlertSocket {
       socket.onClose((event) => {
         if (!this.current(generation)) return;
         if (event.code === 4401) {
-          this.blockedToken = this.context.token;
+          this.blockedSession = this.context.session;
           this.stop('auth_failed');
           this.onAuthExpired();
         } else this.fail(generation);
