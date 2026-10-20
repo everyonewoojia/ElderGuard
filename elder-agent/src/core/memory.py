@@ -3,6 +3,8 @@
 """
 import json
 import logging
+import os
+import tempfile
 from datetime import datetime
 from typing import Optional
 from pathlib import Path
@@ -31,9 +33,50 @@ class MemoryManager:
         }
     
     def _save_long_term(self):
-        """保存长期记忆"""
-        with open(self.long_term_file, "w", encoding="utf-8") as f:
-            json.dump(self.long_term, f, ensure_ascii=False, indent=2)
+        """Atomically replace the profile, including durable local revocations."""
+        temporary = None
+        identity = None
+        try:
+            with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8",
+                                             dir=self.data_dir, prefix=".profile-",
+                                             delete=False) as output:
+                temporary = Path(output.name)
+                info = os.fstat(output.fileno())
+                identity = (info.st_dev, info.st_ino)
+                json.dump(self.long_term, output, ensure_ascii=False, indent=2)
+                output.flush()
+                os.fsync(output.fileno())
+            os.replace(temporary, self.long_term_file)
+            temporary = None
+        finally:
+            if temporary is not None and temporary.exists():
+                current = temporary.lstat()
+                if (current.st_dev, current.st_ino) == identity and not temporary.is_symlink():
+                    temporary.unlink()
+
+    def get_local_privacy_revoked(self) -> bool:
+        """Missing marker means no local veto, never permission to collect."""
+        value = self.long_term["preferences"].get("privacy_local_revoked", False)
+        if type(value) is not bool:
+            raise ValueError("Local privacy record invalid")
+        return value
+
+    def set_local_privacy_revoked(self, revoked: bool) -> None:
+        """Persist only the local veto; credentials and cloud grants are excluded."""
+        if type(revoked) is not bool:
+            raise ValueError("Local privacy record invalid")
+        preferences = self.long_term["preferences"]
+        missing = object()
+        previous = preferences.get("privacy_local_revoked", missing)
+        preferences["privacy_local_revoked"] = revoked
+        try:
+            self._save_long_term()
+        except Exception:
+            if previous is missing:
+                preferences.pop("privacy_local_revoked", None)
+            else:
+                preferences["privacy_local_revoked"] = previous
+            raise
     
     async def save(self, event: dict):
         """保存事件到记忆"""

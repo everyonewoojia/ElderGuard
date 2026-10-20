@@ -86,3 +86,27 @@ def test_get_subscribers():
     """get_subscribers 返回当前订阅者列表"""
     bus = EventBus()
     assert bus.get_subscribers("nope") == []
+
+
+async def test_dispatch_reports_failure_and_rejection_without_claiming_persistence():
+    bus = EventBus()
+    calls = []
+
+    async def bad(event):
+        raise RuntimeError("controlled plugin failure")
+
+    async def rejected(event):
+        calls.append("rejected")
+        return False
+
+    async def good(event):
+        calls.append("good")
+
+    await bus.subscribe("help", bad)
+    await bus.subscribe("help", rejected)
+    await bus.subscribe("help", good)
+    reports = await bus.publish({"type": "help", "priority": "P0"})
+    assert calls == ["rejected", "good"]
+    assert reports == [{"subscribers": 3, "completed": 1, "rejected": 1, "failed": 1}]
+    assert "persisted" not in reports[0]
+    assert "cloud_received" not in reports[0]

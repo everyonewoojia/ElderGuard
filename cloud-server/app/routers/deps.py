@@ -12,6 +12,7 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.config import FamilyAuthConfigurationError
 from app.models.models import User, Elder
 from app.services.auth import decode_token
 from app.services.storage import get_elder
@@ -24,11 +25,14 @@ def get_current_user(
     db: Session = Depends(get_db),
 ) -> User:
     """解析 token 并返回当前登录用户；无效 / 过期 / 用户不存在 → 401。"""
-    payload = decode_token(token)
+    try:
+        payload = decode_token(token)
+    except FamilyAuthConfigurationError:
+        raise HTTPException(status_code=503, detail="家属认证配置不可用") from None
     if payload is None:
         raise HTTPException(status_code=401, detail="无效的令牌")
     user = db.query(User).filter(User.username == payload.get("sub")).first()
-    if user is None:
+    if user is None or user.is_active is not True:
         raise HTTPException(status_code=401, detail="用户不存在或令牌无效")
     return user
 

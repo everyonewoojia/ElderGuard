@@ -44,7 +44,10 @@ def test_retry_records_on_exception():
     ok = svc.push({}, None)
     assert ok is False
     assert svc.failure_count() == 1
-    assert "网络异常" in svc.failures[0]["error"]
+    assert svc.failures[0]["error"] == "transport_error"
+    assert svc.failures[0]["attempts"] == 3
+    assert svc.failures[0]["payload"] is None
+    assert svc.failures[0]["target"] is None
 
 
 @pytest.mark.asyncio

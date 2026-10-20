@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 from app.core.database import get_db
 from app.core.config import settings
+from app.core.config import FamilyAuthConfigurationError
 from app.models.models import User
 from app.routers.deps import get_current_user
 from app.services.auth import verify_password, get_password_hash, create_access_token
@@ -43,15 +44,18 @@ async def register(data: RegisterRequest, db: Session = Depends(get_db)):
 @router.post("/login")
 async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == form_data.username).first()
-    if not user or not verify_password(form_data.password, user.password_hash):
+    if not user or user.is_active is not True or not verify_password(form_data.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="用户名或密码错误"
         )
-    access_token = create_access_token(
-        data={"sub": user.username, "role": user.role},
-        expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    )
+    try:
+        access_token = create_access_token(
+            data={"sub": user.username, "role": user.role},
+            expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        )
+    except FamilyAuthConfigurationError:
+        raise HTTPException(status_code=503, detail="家属认证配置不可用") from None
     return {"access_token": access_token, "token_type": "bearer"}
 
 

@@ -37,24 +37,32 @@ class EventBus:
             if event_type in self._subscribers and callback in self._subscribers[event_type]:
                 self._subscribers[event_type].remove(callback)
 
-    async def publish(self, *events):
+    async def publish(self, *events) -> list[dict]:
         """发布一个或多个事件，按 priority 从高到低（P0→P1→P2）优先分发。
 
-        单事件调用 `publish(event)` 与旧接口兼容。
+        返回分发计数，不代表事件已持久化或云端已接收。
+        单个订阅者失败仍不阻止后续订阅者；取消异常继续向上传播。
         """
         ordered = sorted(events, key=_priority_key)
+        reports = []
         for event in ordered:
-            await self._dispatch(event)
+            reports.append(await self._dispatch(event))
+        return reports
 
-    async def _dispatch(self, event: dict):
+    async def _dispatch(self, event: dict) -> dict:
         """将单个事件分发给其类型的订阅者，单订阅者异常隔离（KK04）"""
         event_type = event.get("type", "unknown")
         logger.info(f"分发事件: {event_type}, 优先级: {event.get('priority', 'P1')}")
-        for callback in list(self._subscribers.get(event_type, [])):
+        subscribers = list(self._subscribers.get(event_type, []))
+        report = {"subscribers": len(subscribers), "completed": 0, "rejected": 0, "failed": 0}
+        for callback in subscribers:
             try:
-                await callback(event)
-            except Exception as e:  # noqa: BLE001 - 插件异常隔离，不中断其他订阅者
-                logger.error(f"事件处理异常(已隔离) {event_type}: {e}")
+                result = await callback(event)
+                report["rejected" if result is False else "completed"] += 1
+            except Exception:  # 插件异常隔离；向发布者返回失败，不输出原始异常。
+                report["failed"] += 1
+                logger.error("Subscriber failed; isolated from remaining subscribers")
+        return report
 
     def get_subscribers(self, event_type: str) -> List[Callable]:
         """获取订阅者"""

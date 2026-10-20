@@ -3,14 +3,11 @@
 覆盖 §7.3/§7.4：XN02 ≥100 家庭并发接入与隔离、AQ01 越权回归、AQ04 数据完整性、
 KY02 备份与恢复。P10-4 全量回归由三端全量 pytest 落地。
 """
-import os
-import shutil
 from concurrent.futures import ThreadPoolExecutor
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from app.core.database import engine
 from app.models.models import Elder
 from app.services import storage
 
@@ -80,20 +77,18 @@ def test_aq04_write_integrity_no_overwrite(db):
 # ---------------------------------------------------------------------------
 # P10-2 可靠性：KY02 数据库备份与恢复
 # ---------------------------------------------------------------------------
-def test_ky02_backup_and_restore(db, tmp_path):
+def test_ky02_backup_and_restore(db, test_database):
     """复制数据库文件作为备份；模拟故障后用备份恢复可读原数据。"""
     owner = storage.create_user(db, "u_backup", "hash", role="family")
     elder = storage.create_elder(db, owner.id, "张奶奶")
     db.commit()
 
-    db_url = str(engine.url.database)
-    db_file = db_url if os.path.isabs(db_url) else os.path.join(os.getcwd(), db_url)
-    backup = tmp_path / "backup.db"
     elder_id = elder.id  # db.close() 前先取 id（关闭后对象不可再访问）
     db.close()
-    shutil.copyfile(db_file, backup)
+    backup = test_database.backup()
 
     engine2 = create_engine(f"sqlite:///{backup}")
+    test_database.validate_backup_engine(engine2, backup)
     S = sessionmaker(bind=engine2)
     s = S()
     try:
