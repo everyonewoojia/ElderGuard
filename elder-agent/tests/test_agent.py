@@ -98,8 +98,9 @@ async def test_unknown_intent_no_alert(tmp_data_dir):
     assert len(agent.tts.speaks) >= 1
 
 
-async def test_default_construction_works():
+async def test_default_construction_works(tmp_path, monkeypatch):
     """默认构造（无注入）仍可创建 Agent，接口契约保持"""
+    monkeypatch.chdir(tmp_path)  # Default data/ must be fresh, never a deployment profile.
     agent = ElderAgent()
     assert agent.event_bus is not None
     assert agent.memory is not None

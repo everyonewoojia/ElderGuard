@@ -4,10 +4,32 @@
 不依赖 jsonschema 等第三方库，保证本阶段测试可零依赖运行。
 """
 from typing import Any
+from uuid import uuid4
+
+import pytest
 
 EVENT_TYPES = {"fall", "sedentary", "voice", "config", "alert"}
 PRIORITIES = {"P0", "P1", "P2"}
 SOURCES = {"edge", "cloud", "family"}
+
+
+def test_device_alert_contract_requires_canonical_client_identity():
+    """The new edge contract is stricter than generic legacy event examples."""
+    from pydantic import ValidationError
+    from app.routers.edge import EdgeAlertIn
+    identity = str(uuid4())
+    body = {"elder_id": 1, "event_id": identity, "alert_type": "help"}
+    assert EdgeAlertIn(**body).event_id == identity
+    assert "event_id" in EdgeAlertIn.model_json_schema()["required"]
+    for invalid in ({"elder_id": 1, "alert_type": "help"}, {**body, "event_id": "evt_legacy"}):
+        with pytest.raises(ValidationError):
+            EdgeAlertIn(**invalid)
+
+
+def test_device_identity_cannot_be_supplied_as_alert_business_data():
+    from app.routers.edge import EdgeAlertIn
+    data = EdgeAlertIn(elder_id=1, event_id=str(uuid4()), alert_type="help", device_id="untrusted")
+    assert "device_id" not in data.model_dump()
 
 # 契约中约定的样例负载
 SAMPLE_EVENT = {

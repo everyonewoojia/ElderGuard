@@ -125,14 +125,15 @@ async def test_ky01_offline_cache_and_recovery():
     calls = {"n": 0}
 
     class FakeClient:
-        async def report_alert(self, elder_id, alert_type, priority, content=None):
+        async def report_alert(self, elder_id, alert_type, priority, content=None, *, event_id):
             calls["n"] += 1
             if calls["n"] <= 1:  # 首次断网失败
                 return None
             return {"alert_id": 1}
 
     reporter = EdgeReporter(FakeClient())
-    ok = await reporter.report(1, "fall", "P0")
+    from uuid import uuid4
+    ok = await reporter.report(1, "fall", "P0", event_id=str(uuid4()))
     assert ok is False
     assert len(reporter.pending) == 1  # 已入离线缓存
     n_fail = await reporter.flush()  # 网络恢复，补发

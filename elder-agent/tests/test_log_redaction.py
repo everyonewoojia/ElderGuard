@@ -1,27 +1,35 @@
-"""Offline log redaction tests for the approved candidate D modules."""
+"""Real application methods with synthetic inputs; no network or audio devices."""
 import asyncio
 from datetime import datetime, timedelta
+import importlib
+import json
 import logging
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, call
 
+import httpx
 import pytest
 
+from src.ai.asr import ASRService
 from src.ai.call import CallService
 from src.ai.intent import IntentService
 from src.ai.tts import TTSService
 from src.core.event_bus import EventBus
+from src.core.privacy import PrivacyGuard
+from src.integration.edge import EdgeClient
 from src.plugins.command import CommandPlugin
 from src.plugins.reminder import ReminderPlugin
 
 
+ASR = "SYNTHETIC_ASR_CANARY_7F21"
 TTS = "SYNTHETIC_TTS_CANARY_8A32"
 INTENT = "SYNTHETIC_INTENT_CANARY_9B43"
 TARGET = "SYNTHETIC_TARGET_CANARY_1C54"
+URL = "SYNTHETIC_URL_CANARY_2D65"
 COMMAND = "SYNTHETIC_COMMAND_CANARY_3E76"
 TITLE = "SYNTHETIC_TITLE_CANARY_4F87"
 TOKEN = "SYNTHETIC_TOKEN_HEADER.SYNTHETIC_TOKEN_PAYLOAD.SYNTHETIC_TOKEN_SIGNATURE"
-MARKERS = (TTS, INTENT, TARGET, COMMAND, TITLE, TOKEN)
+MARKERS = (ASR, TTS, INTENT, TARGET, URL, COMMAND, TITLE, TOKEN)
 
 
 def safe_records(caplog, event=None, *, logger=None, arguments=()):
@@ -36,6 +44,38 @@ def safe_records(caplog, event=None, *, logger=None, arguments=()):
         matches = [r for r in caplog.records if r.name == logger and r.msg == event]
         assert len(matches) == 1, "the controlled diagnostic must remain present"
         assert matches[0].args == arguments
+
+
+@pytest.mark.parametrize("outcome", ["recognized", "empty", "partial", "failure", "unauthorized"])
+async def test_asr_real_recognize_preserves_results_without_logging_text(outcome, caplog):
+    """Exercise the accepted-result branch rather than replacing recognize()."""
+    caplog.set_level(logging.INFO)
+    service = ASRService(PrivacyGuard(outcome != "unauthorized"))
+    recognizer = Mock()
+    recognizer.AcceptWaveform.return_value = outcome != "partial"
+    recognizer.FinalResult.return_value = json.dumps({"text": "" if outcome == "empty" else ASR})
+    service._recognizer = recognizer
+    error = RuntimeError(ASR)
+    if outcome == "failure":
+        recognizer.AcceptWaveform.side_effect = error
+        with pytest.raises(RuntimeError) as captured:
+            await service.recognize(b"synthetic audio")
+        assert captured.value is error
+        assert caplog.records == []
+    else:
+        result = await service.recognize(b"synthetic audio")
+        assert result == (ASR if outcome == "recognized" else None)
+        if outcome == "recognized":
+            safe_records(caplog, "ASR recognition completed", logger="src.ai.asr")
+        if outcome == "unauthorized":
+            recognizer.AcceptWaveform.assert_not_called()
+            assert service.privacy.capture_count == 0
+        elif outcome == "partial":
+            recognizer.FinalResult.assert_not_called()
+    safe_records(caplog)
+    await service.close()
+    assert service._recognizer is None and service.status == "closed"
+
 
 @pytest.mark.parametrize("outcome", ["audio", "none", "empty", "synthesis-error", "playback-error",
                                     "synthesis-cancel", "playback-cancel"])
@@ -86,10 +126,10 @@ async def test_intent_failure_keeps_real_rule_fallback_and_safe_log(kind, caplog
              "unprintable": UnprintableError}.get(kind, RuntimeError)("" if kind == "empty" else INTENT)
     if kind == "chain":
         error.__cause__ = ValueError(TOKEN)
-        error.__context__ = ConnectionError(TARGET)
+        error.__context__ = ConnectionError(URL)
     service = IntentService()
     service._cloud_parse = AsyncMock(side_effect=error)
-    text = "help " + INTENT
+    text = "救命 " + INTENT
     result = await service.parse(text)
     assert result == {"type": "help", "priority": "P0", "content": text}
     service._cloud_parse.assert_awaited_once_with(text)
@@ -120,13 +160,13 @@ async def test_command_real_dispatch_never_logs_input(command, caplog):
     """Compatibility entry tests do not claim default microphone reachability."""
     caplog.set_level(logging.INFO)
     plugin = CommandPlugin(EventBus())
-    text = {"help": "help ", "reminder": "\u63d0\u9192 ", "time": "\u65f6\u95f4 "}.get(command, "unknown ") + COMMAND
+    text = {"help": "帮忙", "reminder": "提醒", "time": "几点"}.get(command, "未知") + COMMAND
     assert await plugin.handle_event({"payload": {"text": text}}) is None
     assert plugin.executed == ([] if command == "unmatched" else [command])
     if command == "unmatched":
         safe_records(caplog, "Command unmatched", logger="src.plugins.command")
     else:
-        safe_records(caplog, f"\u6267\u884c\u6280\u80fd: {command}", logger="src.plugins.command")
+        safe_records(caplog, f"执行技能: {command}", logger="src.plugins.command")
 
 
 @pytest.mark.parametrize("target", ["valid", "empty", "whitespace", "none"])
@@ -154,7 +194,7 @@ async def test_reminder_preserves_title_schedule_state_and_cancellation(kind, ca
     now = [datetime(2026, 1, 1, 8)]
     memory = SimpleNamespace(save=AsyncMock())
     plugin = ReminderPlugin(EventBus(), memory=memory, now=lambda: now[0])
-    await plugin.handle_event({"payload": {"task_type": "\u4e45\u5750\u63d0\u9192" if kind == "sedentary" else "\u7528\u836f\u63d0\u9192",
+    await plugin.handle_event({"payload": {"task_type": "久坐提醒" if kind == "sedentary" else "用药提醒",
                                           "title": TITLE, "schedule_time": "08:30"}})
     if kind == "sedentary":
         assert await plugin.check_sedentary() is False
@@ -177,3 +217,37 @@ async def test_reminder_preserves_title_schedule_state_and_cancellation(kind, ca
     timer.cancel.assert_called_once_with()
     safe_records(caplog, "Reminder task received", logger="src.plugins.reminder")
     safe_records(caplog, "Reminder scheduled: %s", logger="src.plugins.reminder", arguments=("task_0",))
+
+
+@pytest.mark.parametrize("repetitions", [1, 2])
+async def test_real_httpx_url_logs_are_blocked_but_application_status_remains(repetitions, caplog):
+    """Real AsyncClient/MockTransport emits its own INFO URL unless policy works."""
+    from src import main
+
+    caplog.set_level(logging.INFO)
+    logger = logging.getLogger("httpx")
+    child = logging.getLogger("httpx.synthetic_child")
+    previous = (logger.level, logger.disabled, logger.propagate, child.level)
+    handlers = list(logging.getLogger().handlers)
+    try:
+        logger.disabled, logger.propagate = False, True
+        logger.setLevel(logging.INFO)
+        child.setLevel(logging.NOTSET)
+        for _ in range(repetitions):
+            importlib.reload(main)  # Definitions only: no main(), dotenv or Agent construction.
+            async with httpx.AsyncClient(transport=httpx.MockTransport(lambda request: httpx.Response(503))) as http:
+                client = EdgeClient(base_url="https://example.invalid/" + URL, device_token=TOKEN, client=http)
+                assert await client.fetch_privacy(123456789) is None
+            child.info(URL)
+        assert logger.getEffectiveLevel() == logging.WARNING
+        assert child.getEffectiveLevel() == logging.WARNING
+        assert list(logging.getLogger().handlers) == handlers
+        assert not [r for r in caplog.records if r.name == "httpx" or r.name.startswith("httpx.")]
+        status = [r for r in caplog.records if r.name == "src.integration.edge"]
+        assert len(status) == repetitions
+        assert all(r.msg == "edge request rejected: status=%d" and r.args == (503,) for r in status)
+        safe_records(caplog)
+    finally:
+        logger.setLevel(previous[0])
+        logger.disabled, logger.propagate = previous[1:3]
+        child.setLevel(previous[3])

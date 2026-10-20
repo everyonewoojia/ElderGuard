@@ -9,6 +9,17 @@ from typing import Any, Callable, Optional
 
 logger = logging.getLogger(__name__)
 
+_ERROR_CATEGORIES = frozenset({"transport_error", "timeout", "delivery_error", "unknown_error"})
+
+
+def _error_category(error: Exception) -> str:
+    """Classify known transport exceptions without formatting untrusted data."""
+    if isinstance(error, TimeoutError):
+        return "timeout"
+    if isinstance(error, ConnectionError):
+        return "transport_error"
+    return "unknown_error"
+
 
 class PushRetryService:
     """带重试上限的推送器：失败重试 ≤ max_retries 次，最终失败有记录。"""
@@ -28,9 +39,9 @@ class PushRetryService:
                 result = self.sender(payload, target) if self.sender else True
                 if result:
                     return True
-                last_error = "sender 返回失败"
+                last_error = "delivery_error"
             except Exception as e:  # noqa: BLE001 - 网络异常均应重试
-                last_error = str(e)
+                last_error = _error_category(e)
         self._record(payload, target, attempts, last_error)
         return False
 
@@ -46,17 +57,23 @@ class PushRetryService:
                     result = await result
                 if result:
                     return True
-                last_error = "sender 返回失败"
+                last_error = "delivery_error"
             except Exception as e:  # noqa: BLE001 - 网络异常均应重试
-                last_error = str(e)
+                last_error = _error_category(e)
         self._record(payload, target, attempts, last_error)
         return False
 
     def _record(self, payload, target, attempts, error):
+        """Keep legacy keys, replacing private objects and error text with safe values."""
+        category = error if type(error) is str and error in _ERROR_CATEGORIES else "unknown_error"
         self.failures.append(
-            {"payload": payload, "target": target, "attempts": attempts, "error": error}
+            {"payload": None, "target": None, "attempts": attempts, "error": category}
         )
-        logger.error("推送最终失败（重试 %d 次）: %s", attempts, error)
+        try:
+            logger.error("push_retry_failed attempts=%d category=%s", attempts, category)
+        except Exception:  # A diagnostic sink failure must not expose another raw exception.
+            # The completed failure remains available through failure_count/failures.
+            pass
 
     def failure_count(self) -> int:
         """记录到的最终失败条数。"""

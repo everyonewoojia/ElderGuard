@@ -35,6 +35,11 @@ class RecordingASR(ASRService):
         self.listen_calls = 0
         self.recognize_calls = 0
 
+    async def init(self):
+        """Initialize the fake only after the shared guard permits it."""
+        assert self.privacy.is_enabled()
+        return True
+
     async def listen(self):
         self.listen_calls += 1
         return b"x"
@@ -77,5 +82,10 @@ async def test_agent_sense_authorized_captures(tmp_data_dir):
         intent=IntentService(),
         privacy=guard,
     )
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+    agent.edge_client = SimpleNamespace(fetch_privacy=AsyncMock(return_value=True))
+    agent.elder_id = 1
+    assert await agent.sync_privacy() is True
     await agent._sense()
     assert asr.listen_calls == 1

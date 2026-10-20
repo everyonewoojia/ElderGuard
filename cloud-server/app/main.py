@@ -1,14 +1,38 @@
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from contextlib import asynccontextmanager, contextmanager
 
 from app.core.config import settings
 from app.routers import auth, tasks, alerts, elder, privacy, edge, ws
+from app.core import database
+from app.services.alert_delivery import DeliveryService, DeliveryWorker, DeliveryError
+
+
+@asynccontextmanager
+async def lifespan(application):
+    """No startup DDL; keep one worker and finish shutdown before fixture cleanup."""
+    settings.family_signing_key()
+    previous = getattr(application.state, "delivery_worker", None)
+    if previous is not None and previous.task is not None:
+        raise DeliveryError("notification_worker_already_owned")
+    # Tests already override the REST Session generator with P0-12 checks.
+    # Reuse that exact scope; no second engine/factory or weaker test path.
+    override = application.dependency_overrides.get(database.get_db)
+    scope = contextmanager(override) if override is not None else None
+    worker = DeliveryWorker(DeliveryService(session_scope=scope))
+    application.state.delivery_worker = worker
+    try:
+        await worker.start()
+        yield
+    finally:
+        await worker.stop()
 
 app = FastAPI(
     title="银发守护 Agent 中枢服务",
     description="空巢老人智能看护系统云端服务",
-    version="0.1.0"
+    version="0.1.0",
+    lifespan=lifespan,
 )
 
 
@@ -39,4 +63,15 @@ app.include_router(ws.router, prefix="/api/v1", tags=["实时推送"])
 
 @app.get("/health")
 async def health_check():
+    """Public readiness exposes no database, backlog, operator or error details."""
+    worker = getattr(app.state, "delivery_worker", None)
+    if worker is None:
+        return JSONResponse(status_code=503, content={"status": "degraded"})
+    health = worker.health()
+    # A stale/absent completed-loop heartbeat is not evidence of readiness.
+    from datetime import datetime, timezone
+    heartbeat = health["last_loop_at"]
+    stale = heartbeat is None or (datetime.now(timezone.utc) - datetime.fromisoformat(heartbeat)).total_seconds() > 10
+    if health["state"] != "running" or stale:
+        return JSONResponse(status_code=503, content={"status": "degraded"})
     return {"status": "healthy"}

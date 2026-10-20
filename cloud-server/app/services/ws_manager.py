@@ -34,7 +34,7 @@ class WSManager:
         return list(self._connections.keys())
 
     async def push_to_user(self, user_id: int, payload: dict) -> int:
-        """向某家属的全部在线连接推送一条消息，返回实际送达连接数。"""
+        """返回 send_json 正常返回的连接数；不证明终端送达或家属确认。"""
         conns = self._connections.get(user_id, [])
         sent = 0
         for ws in list(conns):
