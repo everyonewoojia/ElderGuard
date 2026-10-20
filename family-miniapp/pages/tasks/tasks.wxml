@@ -1,0 +1,18 @@
+<view class="container">
+  <view wx:if="{{loading}}" class="card text-center">加载中…</view>
+  <view wx:elif="{{error}}" class="card text-center">
+    <view>{{error}}</view>
+    <button class="btn-primary mt-20" bindtap="refresh">重试</button>
+  </view>
+  <view wx:elif="{{empty}}" class="card text-center">暂无提醒任务或未绑定老人</view>
+  <block wx:else>
+    <view class="card" wx:for="{{tasks}}" wx:key="id">
+      <view class="card-title">{{item.title}}</view>
+      <view class="card-content">
+        <view wx:if="{{item.content}}">内容：{{item.content}}</view>
+        <view wx:if="{{item.schedule_time}}">提醒时间：{{item.schedule_time}}</view>
+        <view>状态：{{item.is_active ? '已启用' : '已停用'}}</view>
+      </view>
+    </view>
+  </block>
+</view>

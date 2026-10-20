@@ -1,0 +1,18 @@
+<view class="container">
+  <view wx:if="{{loading}}" class="card text-center">加载中…</view>
+  <view wx:elif="{{error}}" class="card text-center">
+    <view>{{error}}</view>
+    <button class="btn-primary mt-20" bindtap="refresh">重试</button>
+  </view>
+  <view wx:elif="{{empty}}" class="card text-center">暂无绑定老人</view>
+  <view wx:elif="{{elder}}" class="card">
+    <view class="card-title">老人信息</view>
+    <view class="card-content">
+      <view>姓名：{{elder.name}}</view>
+      <view>年龄：{{elder.age == null ? '未填写' : elder.age}}</view>
+      <view>电话：{{elder.phone || '未填写'}}</view>
+      <view>地址：{{elder.address || '未填写'}}</view>
+      <view>隐私授权：{{elder.privacy_enabled ? '已启用' : '未启用'}}</view>
+    </view>
+  </view>
+</view>

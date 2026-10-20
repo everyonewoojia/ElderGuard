@@ -16,11 +16,14 @@ function loadApi({ wxMock, appMock }) {
   global.getApp = () => appMock;
   global.wx = wxMock;
   delete require.cache[require.resolve('../utils/api.js')];
-  return require('../utils/api.js');
+  const api = require('../utils/api.js');
+  api.configureEnvironment(appMock, 'test', { environment: 'test', source: 'offline-test',
+    baseUrl: appMock.globalData.baseUrl, apiTrustedHosts: appMock.globalData.apiTrustedHosts });
+  return api;
 }
 
 function makeAppMock(baseUrl, token) {
-  return { globalData: { baseUrl, token } };
+  return { globalData: { baseUrl, token, apiTrustedHosts: ['srv'] } };
 }
 
 /** 生成一个可编程的 wx.request mock */
@@ -74,5 +77,10 @@ test('非 2xx 返回错误消息并 reject', async () => {
   const { wx } = makeWxMock({ statusCode: 403, body: { message: '越权访问' } });
   const api = loadApi({ wxMock: wx, appMock: makeAppMock('https://srv/api/v1', 't') });
 
-  await assert.rejects(api.del('/tasks/9'), /越权访问/);
+  await assert.rejects(api.del('/tasks/9'), (error) => {
+    assert.strictEqual(error.statusCode, 403);
+    assert.strictEqual(error.code, 'HTTP_ERROR');
+    assert.strictEqual(error.message, '无权访问该老人数据');
+    return true;
+  });
 });

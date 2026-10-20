@@ -49,6 +49,8 @@ function loadPage(relPath, { wxMock, appMock }) {
   const pageAbs = path.resolve(__dirname, relPath);
   delete require.cache[apiAbs];
   delete require.cache[pageAbs];
+  require(apiAbs).configureEnvironment(appMock, 'test', { environment: 'test', source: 'offline-test',
+    baseUrl: appMock.globalData.baseUrl, apiTrustedHosts: appMock.globalData.apiTrustedHosts });
   require(pageAbs);
   const inst = Object.assign({}, cfg);
   inst.data = JSON.parse(JSON.stringify(cfg.data));
@@ -57,7 +59,7 @@ function loadPage(relPath, { wxMock, appMock }) {
 }
 
 function makeApp(token) {
-  return { globalData: { baseUrl: 'https://srv/api/v1', token: token || '' } };
+  return { globalData: { baseUrl: 'https://srv/api/v1', apiTrustedHosts: ['srv'], token: token || '' } };
 }
 
 function flush() { return new Promise((r) => setImmediate(r)); }
@@ -110,18 +112,18 @@ test('P7-3 index：拉取绑定老人 + 提醒任务 + 最近告警（仅绑定�
   const routes = {
     'https://srv/api/v1/elder': {
       statusCode: 200,
-      body: { code: 200, data: [{ id: 7, name: '张奶奶', age: 82, privacy_enabled: true }] },
+      body: [{ id: 7, name: '张奶奶', age: 82, privacy_enabled: true }],
     },
     'https://srv/api/v1/tasks': {
       statusCode: 200,
-      body: { code: 200, data: [
+      body: [
         { id: 1, elder_id: 7, task_type: 'medication', title: '服药', is_active: true },
         { id: 2, elder_id: 7, task_type: 'rest', title: '午休', is_active: false },
-      ] },
+      ],
     },
     'https://srv/api/v1/alerts': {
       statusCode: 200,
-      body: { code: 200, data: [{ id: 1, alert_type: 'fall', priority: 'P0', status: 'pending', created_at: '2026-10-16T08:00:00' }] },
+      body: [{ id: 1, alert_type: 'fall', priority: 'P0', status: 'pending', created_at: '2026-10-16T08:00:00' }],
     },
   };
   const { wx, calls } = makeWxMock(routes);
@@ -143,7 +145,7 @@ test('P7-4 alerts：GET /alerts 渲染列表', async () => {
   const { wx, calls } = makeWxMock({
     'https://srv/api/v1/alerts': {
       statusCode: 200,
-      body: { code: 200, data: [{ id: 1, alert_type: 'fall', priority: 'P0', status: 'pending' }] },
+      body: [{ id: 1, alert_type: 'fall', priority: 'P0', status: 'pending' }],
     },
   });
   const page = loadPage('../pages/alerts/alerts.js', { wxMock: wx, appMock: makeApp('tok') });
@@ -158,9 +160,9 @@ test('P7-4 alerts：取消告警 POST /alerts/{id}/cancel 后刷新', async () =
   const { wx, calls } = makeWxMock({
     'https://srv/api/v1/alerts': {
       statusCode: 200,
-      body: { code: 200, data: [{ id: 1, alert_type: 'fall', priority: 'P0', status: 'pending' }] },
+      body: [{ id: 1, alert_type: 'fall', priority: 'P0', status: 'pending' }],
     },
-    'https://srv/api/v1/alerts/1/cancel': { statusCode: 200, body: { code: 200, data: { message: '告警已取消' } } },
+    'https://srv/api/v1/alerts/1/cancel': { statusCode: 200, body: { message: '告警已取消' } },
   });
   const page = loadPage('../pages/alerts/alerts.js', { wxMock: wx, appMock: makeApp('tok') });
   page.onShow();
@@ -177,10 +179,10 @@ test('P7-5 settings：绑定老人 + 隐私开关 + 新增任务 + 退出', asyn
   const routes = {
     'https://srv/api/v1/elder': {
       statusCode: 200,
-      body: { code: 200, data: [{ id: 3, name: '李爷爷', privacy_enabled: false }] },
+      body: [{ id: 3, name: '李爷爷', privacy_enabled: false }],
     },
-    'https://srv/api/v1/privacy/auth': { statusCode: 200, body: { code: 200, data: { message: '隐私授权已更新' } } },
-    'https://srv/api/v1/tasks': { statusCode: 200, body: { code: 200, data: { message: '任务已添加' } } },
+    'https://srv/api/v1/privacy/auth': { statusCode: 200, body: { message: '隐私授权已更新', enabled: true } },
+    'https://srv/api/v1/tasks': { statusCode: 200, body: { id: 1, elder_id: 3, task_type: 'medication', title: '服药', content: '早一粒', schedule_time: '08:00', is_active: true } },
   };
   const { wx, calls } = makeWxMock(routes);
   const app = makeApp('tok');

@@ -1,4 +1,5 @@
 const app = getApp();
+const api = require('../../utils/api');
 
 Page({
   data: {
@@ -14,6 +15,8 @@ Page({
     this.setData({ password: e.detail.value });
   },
 
+  onUnload() { api.cancelLogin(this._loginAttempt); },
+
   login() {
     const { phone, password } = this.data;
 
@@ -22,23 +25,31 @@ Page({
       return;
     }
 
+    let attempt;
+    try { attempt = api.beginLoginAttempt(); }
+    catch (_) { wx.showToast({ title: '服务地址未配置或不安全', icon: 'none' }); return; }
+    this._loginAttempt = attempt;
+
     // 后端 /auth/login 使用 OAuth2PasswordRequestForm（表单编码），
     // 此处以 application/x-www-form-urlencoded 提交以对齐契约。
     wx.request({
-      url: `${app.globalData.baseUrl}/auth/login`,
+      url: `${attempt.baseUrl}/auth/login`,
       method: 'POST',
       header: { 'content-type': 'application/x-www-form-urlencoded' },
       data: `username=${encodeURIComponent(phone)}&password=${encodeURIComponent(password)}`,
       success: (res) => {
-        if (res.statusCode === 200 && res.data.access_token) {
-          app.globalData.token = res.data.access_token;
-          wx.setStorageSync('token', res.data.access_token);
-          wx.switchTab({ url: '/pages/index/index' });
-        } else {
+        if (!api.isLoginCurrent(attempt)) return;
+        if (!(res.statusCode === 200 && res.data
+            && api.acceptLogin(attempt, res.data.access_token,
+              () => wx.switchTab({ url: '/pages/index/index' })))) {
+          if (!api.isLoginCurrent(attempt)) return;
+          api.cancelLogin(attempt);
           wx.showToast({ title: '登录失败', icon: 'none' });
         }
       },
       fail: () => {
+        if (!api.isLoginCurrent(attempt)) return;
+        api.cancelLogin(attempt);
         wx.showToast({ title: '网络错误', icon: 'none' });
       },
     });
