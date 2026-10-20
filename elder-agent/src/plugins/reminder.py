@@ -54,7 +54,7 @@ class ReminderPlugin(BasePlugin):
         task_type = payload.get("task_type", "")
         title = payload.get("title", "")
 
-        logger.info(f"收到提醒任务: {title}")
+        logger.info("Reminder task received")
 
         if task_type == "久坐提醒":
             await self._setup_sedentary_reminder(title)
@@ -105,7 +105,7 @@ class ReminderPlugin(BasePlugin):
             "status": "pending",
             "schedule_time": (payload or {}).get("schedule_time"),
         }
-        logger.info(f"发送提醒: {title} ({task_id})")
+        logger.info("Reminder scheduled: %s", task_id)
 
     def get_task_status(self, task_id: Optional[str] = None):
         """任务状态查询（FR-CM-02）；不传 id 返回全部任务"""

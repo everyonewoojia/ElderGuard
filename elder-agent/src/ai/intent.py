@@ -17,8 +17,8 @@ class IntentService:
         """解析意图：优先云端，失败/为空时回退本地规则匹配（FR-CM-06/CON-D-06）"""
         try:
             intent = await self._cloud_parse(text)
-        except Exception as e:  # noqa: BLE001 - 云端异常回退本地规则
-            logger.warning(f"云端意图解析异常，回退本地规则: {e}")
+        except Exception:  # noqa: BLE001 - 云端异常回退本地规则
+            logger.warning("Intent cloud parsing unavailable; using local rules")
             intent = None
 
         if intent:

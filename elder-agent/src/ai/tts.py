@@ -18,7 +18,7 @@ class TTSService:
 
         返回是否成功播报：合成失败/未配置时返回 False（不崩溃，供上层降级判断）。
         """
-        logger.info(f"语音播报: {text}")
+        logger.info("Speech synthesis requested")
 
         audio_data = await self._synthesize(text)
         if not audio_data:

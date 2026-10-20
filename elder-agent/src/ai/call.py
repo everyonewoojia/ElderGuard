@@ -28,7 +28,7 @@ class CallService:
             return False
         self._connected = True
         self._target = target
-        logger.info("通话建立: %s", target)
+        logger.info("Call connected")
         return True
 
     async def disconnect(self) -> bool:
